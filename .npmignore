@@ -9,6 +9,8 @@ __tests__/
 *.spec.ts
 
 # Ignore config files
+.eslintrc.js
+.prettierrc
 tsconfig.json
 jest.config.*
 rollup.config.*
