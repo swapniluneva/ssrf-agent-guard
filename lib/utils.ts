@@ -18,24 +18,15 @@ function isPublicIp(ip: string): boolean {
 }
 
 /**
- * Validates whether a domain is syntactically valid.
- */
-function isSafeIp(hostname: string): boolean {
-    // Case 1: IP address
-    if (isIp(hostname)) {
-        return isPublicIp(hostname); // only allow public IPs
-    }
-    return true;
-}
-
-/**
  * High-level validation for hostnames (domains + public IPs).
  */
 export function isSafeHost(hostname: string, isValidDomainOptions?: IsValidDomainOptions): boolean {
     // Block cloud metadata IP/domains
     if (CLOUD_METADATA_HOSTS.indexOf(hostname) !== -1) return false;
 
-    if (!isSafeIp(hostname)) return false;
+    // Case 1: IP address
+    if(isIp(hostname))
+        return isPublicIp(hostname);
 
     // Case 2: Domain name
     return isValidDomain(hostname, {
