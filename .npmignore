@@ -1,0 +1,40 @@
+# Ignore source TypeScript files
+src/
+*.ts
+
+# Ignore tests
+test/
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Ignore config files
+tsconfig.json
+jest.config.*
+rollup.config.*
+*.log
+
+# Ignore build caches
+node_modules/
+coverage/
+.nyc_output/
+.cache/
+
+# Ignore local environment files
+.env
+.env.*
+.DS_Store
+
+# Git / editor files
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Ignore examples or demo folders
+examples/
+demo/
