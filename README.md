@@ -94,6 +94,12 @@ npm test
 
 ---
 
+## Credits: 
+  * SSRF prevention techniques: [SSRF Cheatsheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+  * Implementation inspired By [ssrf-req-filter](https://github.com/y-mehta/ssrf-req-filter/)
+
+---
+
 ## License
 
 MIT © [Swapnil Srivastava](https://swapniluneva.github.io)
