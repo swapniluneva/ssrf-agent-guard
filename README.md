@@ -24,7 +24,7 @@ yarn add ssrf-agent-guard
 
 ## Usage
 
-isValidDomainOptions reference [is-valid-domain](https://github.com/miguelmota/is-valid-domain)
+`isValidDomainOptions` reference [is-valid-domain](https://github.com/miguelmota/is-valid-domain)
 
 ### axios
 
