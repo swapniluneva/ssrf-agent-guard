@@ -1,0 +1,55 @@
+{
+  "name": "ssrf-agent-guard",
+  "version": "0.1.0",
+  "description": "A TypeScript SSRF protection library for Node.js (express/axios) with advanced policies, DNS rebinding detection and cloud metadata protection.",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "test": "jest --coverage",
+    "prepare": "npm run build",
+    "lint": "eslint 'lib/**/*.ts' 'test/**/*.ts'",
+    "lint:fix": "eslint 'lib/**/*.ts' 'test/**/*.ts' --fix",
+    "format": "prettier --write 'lib/**/*.ts' 'test/**/*.ts'"
+  },
+  "keywords": [
+    "ssrf",
+    "security",
+    "ssrf-protection",
+    "axios",
+    "ssrf-agent",
+    "ssrf-agent-guard",
+    "node-fetch"
+  ],
+  "homepage": "https://github.com/swapniluneva/ssrf-agent-guard#readme",
+  "author": {
+    "name": "Swapnil Srivastava",
+    "email": "srivastava.swapnil99@gmail.com",
+    "url": "https://swapniluneva.github.io"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swapniluneva/ssrf-agent-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/swapniluneva/ssrf-agent-guard/issues"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.3",
+    "@types/node": "^20.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.3.0",
+    "@typescript-eslint/parser": "^6.3.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.6.1",
+    "rollup": "^4.53.3",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "ipaddr.js": "^2.2.0",
+    "is-valid-domain": "^0.1.6"
+  }
+}
