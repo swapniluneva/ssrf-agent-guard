@@ -38,7 +38,7 @@ const CREATE_CONNECTION = Symbol('createConnection');
  * @param isValidDomainOptions Options for validating domain names.
  * @returns The patched CustomAgent instance.
  */
-export default function (url: string, isValidDomainOptions?: IsValidDomainOptions): CustomAgent {
+const ssrfAgentGuard = function (url: string, isValidDomainOptions?: IsValidDomainOptions): CustomAgent {
     const finalAgent = getAgent(url);
 
     // Prevent patching the agent multiple times
@@ -79,7 +79,7 @@ export default function (url: string, isValidDomainOptions?: IsValidDomainOption
             // Ensure resolvedAddress is a string for the check (it's typically a string for simple lookups)
             const ipToCheck = Array.isArray(resolvedAddress) ? resolvedAddress[0] : resolvedAddress;
 
-            if (!isSafeIp(ipToCheck)) {
+            if (!isSafeHost(ipToCheck)) {
                 // If the resolved IP is NOT allowed (e.g., a private IP), destroy the connection.
                 return client?.destroy(new Error(`DNS lookup ${ipToCheck} is not allowed.`));
             }
@@ -90,3 +90,6 @@ export default function (url: string, isValidDomainOptions?: IsValidDomainOption
 
     return finalAgent;
 }
+
+export default ssrfAgentGuard;
+module.exports = ssrfAgentGuard;

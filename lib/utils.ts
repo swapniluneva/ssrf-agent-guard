@@ -40,7 +40,7 @@ export function isSafeHost(hostname: string, isValidDomainOptions?: IsValidDomai
     // Case 2: Domain name
     return isValidDomain(hostname, {
         allowUnicode: false,
-        subdomain: false,
+        subdomain: true,
         ...isValidDomainOptions,
     });
 }
