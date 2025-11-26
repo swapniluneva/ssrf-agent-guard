@@ -20,7 +20,7 @@ function isPublicIp(ip: string): boolean {
 /**
  * Validates whether a domain is syntactically valid.
  */
-export function isSafeIp(hostname: string): boolean {
+function isSafeIp(hostname: string): boolean {
     // Case 1: IP address
     if (isIp(hostname)) {
         return isPublicIp(hostname); // only allow public IPs
@@ -33,7 +33,7 @@ export function isSafeIp(hostname: string): boolean {
  */
 export function isSafeHost(hostname: string, isValidDomainOptions?: IsValidDomainOptions): boolean {
     // Block cloud metadata IP/domains
-    if (CLOUD_METADATA_HOSTS.indexOf(hostname)) return false;
+    if (CLOUD_METADATA_HOSTS.indexOf(hostname) !== -1) return false;
 
     if (!isSafeIp(hostname)) return false;
 

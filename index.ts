@@ -2,7 +2,7 @@ import { Agent as HttpAgent, AgentOptions as HttpAgentOptions } from 'http';
 import { Agent as HttpsAgent, AgentOptions as HttpsAgentOptions } from 'https';
 import { Duplex } from 'stream';
 
-import { isSafeHost, isSafeIp } from './lib/utils';
+import { isSafeHost } from './lib/utils';
 import { IsValidDomainOptions } from './lib/types';
 
 // Define the type for the Agent that this module will modify and return.
@@ -51,10 +51,10 @@ const ssrfAgentGuard = function (url: string, isValidDomainOptions?: IsValidDoma
     const createConnection = finalAgent.createConnection;
 
     // Patch the createConnection method on the agent
-    finalAgent.createConnection =  (
+    finalAgent.createConnection =  function(
         options: HttpAgentOptions | HttpsAgentOptions,
         fn?: (err: Error | null, stream: Duplex) => void,
-    ) => {
+    ) {
         const { host: address } = options;
         // --- 1. Pre-DNS Check (Host/Address Check) ---
         // If the 'host' option is an IP address, check it immediately.
@@ -64,7 +64,6 @@ const ssrfAgentGuard = function (url: string, isValidDomainOptions?: IsValidDoma
         }
 
         // Call the original createConnection
-        // @ts-expect-error 'this' is not assignable to type 'HttpAgent | HttpsAgent'
         const client = createConnection.call(this, options, fn);
 
         // --- 2. Post-DNS Check (Lookup Event Check) ---

@@ -35,7 +35,10 @@ const isValidDomainOptions = {
   subdomain: true,
   wildcard: true
 };
-axios.get(url, {httpAgent: ssrfAgentGuard(url), httpsAgent: ssrfAgentGuard(url)})
+axios.get(
+  url, {
+    httpAgent: ssrfAgentGuard(url, isValidDomainOptions), httpsAgent: ssrfAgentGuard(url, isValidDomainOptions)
+    })
       .then((response) => {
         console.log(`Success`);
       })
