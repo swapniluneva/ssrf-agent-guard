@@ -70,18 +70,16 @@ const ssrfAgentGuard = function (url: string, isValidDomainOptions?: IsValidDoma
         // The 'lookup' event fires after the DNS lookup is complete
         // and provides the resolved IP address.
         client?.on('lookup', (err: Error | null, resolvedAddress: string | string[]) => {
-            // If there was an error in lookup, or if the resolved IP is allowed, do nothing.
-            if (err) {
-                return;
-            }
-
             // Ensure resolvedAddress is a string for the check (it's typically a string for simple lookups)
             const ipToCheck = Array.isArray(resolvedAddress) ? resolvedAddress[0] : resolvedAddress;
 
-            if (!isSafeHost(ipToCheck)) {
-                // If the resolved IP is NOT allowed (e.g., a private IP), destroy the connection.
-                return client?.destroy(new Error(`DNS lookup ${ipToCheck} is not allowed.`));
+            // If there was an error in lookup, or if the resolved IP is allowed, do nothing.
+            if (err || isSafeHost(ipToCheck, isValidDomainOptions)) {
+                return false;
             }
+            
+            // If the resolved IP is NOT allowed (e.g., a private IP), destroy the connection.
+            return client?.destroy(new Error(`DNS lookup ${ipToCheck} is not allowed.`));
         });
 
         return client;
