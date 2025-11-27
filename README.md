@@ -1,6 +1,6 @@
 # ssrf-agent-guard
 
-#### SSRF-Guard is a Node.js module for protecting your HTTP/HTTPS requests against SSRF (Server-Side Request Forgery) attacks. It wraps http.Agent and https.Agent to enforce pre and post DNS host/IP checks, block access to cloud metadata endpoints, private IPs, and unsafe domains.
+#### `ssrf-agent-guard` is a Node.js module for protecting your HTTP/HTTPS requests against SSRF (Server-Side Request Forgery) attacks. It wraps http.Agent and https.Agent to enforce pre and post DNS host/IP checks, block access to cloud metadata endpoints, private IPs, and unsafe domains.
 ---
 
 ## Features
