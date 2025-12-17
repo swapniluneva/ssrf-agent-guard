@@ -1,6 +1,9 @@
 # Ignore source TypeScript files
 src/
+lib/
+index.ts
 *.ts
+!*.d.ts
 
 # Ignore tests
 test/
