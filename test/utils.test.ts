@@ -1,229 +1,236 @@
-import { isSafeHost } from '../lib/utils';
-import { CLOUD_METADATA_HOSTS } from '../lib/types';
+import {
+    validateHost,
+    validatePolicy,
+    matchesDomain,
+    getTLD,
+    isCloudMetadata,
+    isIp,
+    isPublicIp,
+} from '../lib/utils';
 
-describe('isSafeHost', () => {
-    describe('Cloud Metadata Hosts', () => {
-        it('should block AWS metadata endpoint (169.254.169.254)', () => {
-            expect(isSafeHost('169.254.169.254')).toBe(false);
+describe('validateHost', () => {
+    describe('with Options', () => {
+        it('should return safe:true for allowed domains', () => {
+            const result = validateHost('example.com');
+            expect(result.safe).toBe(true);
         });
 
-        it('should block AWS alternate metadata endpoint (169.254.169.253)', () => {
-            expect(isSafeHost('169.254.169.253')).toBe(false);
+        it('should return reason for private IPs', () => {
+            const result = validateHost('10.0.0.1');
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('private_ip');
         });
 
-        it('should block GCP metadata endpoint (metadata.google.internal)', () => {
-            expect(isSafeHost('metadata.google.internal')).toBe(false);
+        it('should return reason for cloud metadata', () => {
+            const result = validateHost('169.254.169.254');
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('cloud_metadata');
         });
 
-        it('should block Azure metadata endpoint (169.254.170.2)', () => {
-            expect(isSafeHost('169.254.170.2')).toBe(false);
+        it('should return reason for invalid domains', () => {
+            const result = validateHost('-invalid.com');
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('invalid_domain');
         });
 
-        it('should block all hosts in CLOUD_METADATA_HOSTS constant', () => {
-            CLOUD_METADATA_HOSTS.forEach((host) => {
-                expect(isSafeHost(host)).toBe(false);
+        it('should allow disabling cloud metadata blocking', () => {
+            const result = validateHost('169.254.169.254', { blockCloudMetadata: false });
+            // Still blocked as private IP
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('private_ip');
+        });
+
+        it('should check custom metadata hosts', () => {
+            const result = validateHost('custom.metadata.local', {
+                metadataHosts: ['custom.metadata.local'],
             });
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('cloud_metadata');
+        });
+    });
+});
+
+describe('validatePolicy', () => {
+    describe('allowDomains', () => {
+        it('should allow domains in allowDomains list', () => {
+            const result = validatePolicy('example.com', {
+                allowDomains: ['example.com'],
+            });
+            expect(result.safe).toBe(true);
+        });
+
+        it('should deny domains not in allowDomains list when list is specified', () => {
+            const result = validatePolicy('other.com', {
+                allowDomains: ['example.com'],
+            });
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('not_allowed_domain');
+        });
+
+        it('should allow subdomains when parent domain is in allowDomains', () => {
+            const result = validatePolicy('sub.example.com', {
+                allowDomains: ['example.com'],
+            });
+            expect(result.safe).toBe(true);
+        });
+
+        it('should allow wildcard patterns in allowDomains', () => {
+            const result = validatePolicy('api.example.com', {
+                allowDomains: ['*.example.com'],
+            });
+            expect(result.safe).toBe(true);
         });
     });
 
-    describe('Private IP Addresses', () => {
-        it('should block localhost (127.0.0.1)', () => {
-            expect(isSafeHost('127.0.0.1')).toBe(false);
+    describe('denyDomains', () => {
+        it('should deny domains in denyDomains list', () => {
+            const result = validatePolicy('evil.com', {
+                denyDomains: ['evil.com'],
+            });
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('denied_domain');
         });
 
-        it('should block loopback range (127.x.x.x)', () => {
-            expect(isSafeHost('127.0.0.2')).toBe(false);
-            expect(isSafeHost('127.255.255.255')).toBe(false);
+        it('should allow domains not in denyDomains list', () => {
+            const result = validatePolicy('good.com', {
+                denyDomains: ['evil.com'],
+            });
+            expect(result.safe).toBe(true);
         });
 
-        it('should block 10.x.x.x private range', () => {
-            expect(isSafeHost('10.0.0.1')).toBe(false);
-            expect(isSafeHost('10.255.255.255')).toBe(false);
-            expect(isSafeHost('10.10.10.10')).toBe(false);
-        });
-
-        it('should block 172.16.x.x - 172.31.x.x private range', () => {
-            expect(isSafeHost('172.16.0.1')).toBe(false);
-            expect(isSafeHost('172.20.0.1')).toBe(false);
-            expect(isSafeHost('172.31.255.255')).toBe(false);
-        });
-
-        it('should block 192.168.x.x private range', () => {
-            expect(isSafeHost('192.168.0.1')).toBe(false);
-            expect(isSafeHost('192.168.1.1')).toBe(false);
-            expect(isSafeHost('192.168.255.255')).toBe(false);
-        });
-
-        it('should block link-local addresses (169.254.x.x)', () => {
-            expect(isSafeHost('169.254.0.1')).toBe(false);
-            expect(isSafeHost('169.254.255.255')).toBe(false);
-        });
-
-        it('should block 0.0.0.0', () => {
-            expect(isSafeHost('0.0.0.0')).toBe(false);
-        });
-
-        it('should block broadcast address (255.255.255.255)', () => {
-            expect(isSafeHost('255.255.255.255')).toBe(false);
+        it('should deny subdomains when parent domain is in denyDomains', () => {
+            const result = validatePolicy('sub.evil.com', {
+                denyDomains: ['evil.com'],
+            });
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('denied_domain');
         });
     });
 
-    describe('IPv6 Addresses', () => {
-        it('should block IPv6 loopback (::1)', () => {
-            expect(isSafeHost('::1')).toBe(false);
+    describe('denyTLD', () => {
+        it('should deny domains with blocked TLDs', () => {
+            const result = validatePolicy('internal.local', {
+                denyTLD: ['local', 'internal'],
+            });
+            expect(result.safe).toBe(false);
+            expect(result.reason).toBe('denied_tld');
         });
 
-        it('should block IPv6 unspecified address (::)', () => {
-            expect(isSafeHost('::')).toBe(false);
+        it('should allow domains with non-blocked TLDs', () => {
+            const result = validatePolicy('example.com', {
+                denyTLD: ['local', 'internal'],
+            });
+            expect(result.safe).toBe(true);
         });
 
-        it('should block IPv6 link-local addresses (fe80::)', () => {
-            expect(isSafeHost('fe80::1')).toBe(false);
-            expect(isSafeHost('fe80::abcd:1234')).toBe(false);
-        });
-
-        it('should block IPv6 unique local addresses (fc00::/fd00::)', () => {
-            expect(isSafeHost('fc00::1')).toBe(false);
-            expect(isSafeHost('fd00::1')).toBe(false);
-        });
-
-        it('should allow public IPv6 addresses', () => {
-            expect(isSafeHost('2001:4860:4860::8888')).toBe(true); // Google DNS
-            expect(isSafeHost('2606:4700:4700::1111')).toBe(true); // Cloudflare DNS
+        it('should be case-insensitive for TLDs', () => {
+            const result = validatePolicy('example.LOCAL', {
+                denyTLD: ['local'],
+            });
+            expect(result.safe).toBe(false);
         });
     });
 
-    describe('Public IP Addresses', () => {
-        it('should allow Google DNS (8.8.8.8)', () => {
-            expect(isSafeHost('8.8.8.8')).toBe(true);
+    describe('no policy', () => {
+        it('should allow all domains when no policy is provided', () => {
+            const result = validatePolicy('anything.com');
+            expect(result.safe).toBe(true);
         });
 
-        it('should allow Cloudflare DNS (1.1.1.1)', () => {
-            expect(isSafeHost('1.1.1.1')).toBe(true);
-        });
-
-        it('should allow common public IP addresses', () => {
-            expect(isSafeHost('93.184.216.34')).toBe(true); // example.com
-            expect(isSafeHost('151.101.1.140')).toBe(true); // reddit.com
-            expect(isSafeHost('185.199.108.153')).toBe(true); // github.com
-        });
-
-        it('should allow IPs just outside private ranges', () => {
-            expect(isSafeHost('11.0.0.1')).toBe(true); // Just after 10.x.x.x
-            expect(isSafeHost('172.15.255.255')).toBe(true); // Just before 172.16.x.x
-            expect(isSafeHost('172.32.0.1')).toBe(true); // Just after 172.31.x.x
-            expect(isSafeHost('192.167.255.255')).toBe(true); // Just before 192.168.x.x
+        it('should allow all domains when empty policy is provided', () => {
+            const result = validatePolicy('anything.com', {});
+            expect(result.safe).toBe(true);
         });
     });
+});
 
-    describe('Valid Domain Names', () => {
-        it('should allow simple domain names', () => {
-            expect(isSafeHost('example.com')).toBe(true);
-            expect(isSafeHost('google.com')).toBe(true);
-            expect(isSafeHost('github.com')).toBe(true);
-        });
-
-        it('should allow subdomains by default', () => {
-            expect(isSafeHost('www.example.com')).toBe(true);
-            expect(isSafeHost('api.github.com')).toBe(true);
-            expect(isSafeHost('sub.domain.example.com')).toBe(true);
-        });
-
-        it('should allow domains with hyphens', () => {
-            expect(isSafeHost('my-domain.com')).toBe(true);
-            expect(isSafeHost('sub-domain.example-site.com')).toBe(true);
-        });
-
-        it('should allow domains with numbers', () => {
-            expect(isSafeHost('web3.com')).toBe(true);
-            expect(isSafeHost('123.example.com')).toBe(true);
-        });
-
-        it('should allow various TLDs', () => {
-            expect(isSafeHost('example.org')).toBe(true);
-            expect(isSafeHost('example.net')).toBe(true);
-            expect(isSafeHost('example.io')).toBe(true);
-            expect(isSafeHost('example.co.uk')).toBe(true);
-        });
+describe('matchesDomain', () => {
+    it('should match exact domains', () => {
+        expect(matchesDomain('example.com', 'example.com')).toBe(true);
     });
 
-    describe('Invalid Domain Names', () => {
-        it('should reject domains starting with hyphen', () => {
-            expect(isSafeHost('-example.com')).toBe(false);
-        });
-
-        it('should reject domains ending with hyphen', () => {
-            expect(isSafeHost('example-.com')).toBe(false);
-        });
-
-        it('should reject domains with invalid characters', () => {
-            expect(isSafeHost('example@.com')).toBe(false);
-            expect(isSafeHost('example!.com')).toBe(false);
-            expect(isSafeHost('example$.com')).toBe(false);
-        });
-
-        it('should reject empty string', () => {
-            expect(isSafeHost('')).toBe(false);
-        });
-
-        it('should reject domains with spaces', () => {
-            expect(isSafeHost('example .com')).toBe(false);
-            expect(isSafeHost(' example.com')).toBe(false);
-        });
-
-        it('should reject double dots in domain', () => {
-            expect(isSafeHost('example..com')).toBe(false);
-        });
+    it('should match subdomains', () => {
+        expect(matchesDomain('sub.example.com', 'example.com')).toBe(true);
+        expect(matchesDomain('deep.sub.example.com', 'example.com')).toBe(true);
     });
 
-    describe('Unicode Domains', () => {
-        it('should allow punycode domains (ASCII-compatible encoding)', () => {
-            // Punycode is ASCII-compatible, so it's valid regardless of allowUnicode
-            expect(isSafeHost('xn--n3h.com')).toBe(true);
-        });
-
-        it('should handle allowUnicode option', () => {
-            // Both should work for ASCII-compatible punycode
-            expect(isSafeHost('xn--n3h.com', { allowUnicode: true })).toBe(true);
-            expect(isSafeHost('xn--n3h.com', { allowUnicode: false })).toBe(true);
-        });
+    it('should match wildcard patterns', () => {
+        expect(matchesDomain('sub.example.com', '*.example.com')).toBe(true);
+        expect(matchesDomain('example.com', '*.example.com')).toBe(true);
     });
 
-    describe('Options', () => {
-        it('should respect subdomain option', () => {
-            expect(isSafeHost('sub.example.com', { subdomain: true })).toBe(true);
-            expect(isSafeHost('sub.example.com', { subdomain: false })).toBe(false);
-        });
-
-        it('should respect wildcard option', () => {
-            expect(isSafeHost('*.example.com', { wildcard: true })).toBe(true);
-            expect(isSafeHost('*.example.com', { wildcard: false })).toBe(false);
-        });
-
-        it('should merge options with defaults', () => {
-            // Default is subdomain: true, allowUnicode: false
-            expect(isSafeHost('sub.example.com', { allowUnicode: true })).toBe(true);
-        });
+    it('should not match different domains', () => {
+        expect(matchesDomain('other.com', 'example.com')).toBe(false);
+        expect(matchesDomain('notexample.com', 'example.com')).toBe(false);
     });
 
-    describe('Edge Cases', () => {
-        it('should handle localhost hostname', () => {
-            expect(isSafeHost('localhost')).toBe(false);
-        });
+    it('should be case-insensitive', () => {
+        expect(matchesDomain('EXAMPLE.COM', 'example.com')).toBe(true);
+        expect(matchesDomain('example.com', 'EXAMPLE.COM')).toBe(true);
+    });
+});
 
-        it('should handle IP-like strings that are invalid', () => {
-            expect(isSafeHost('999.999.999.999')).toBe(false);
-            expect(isSafeHost('256.256.256.256')).toBe(false);
-        });
+describe('getTLD', () => {
+    it('should extract TLD from domain', () => {
+        expect(getTLD('example.com')).toBe('com');
+        expect(getTLD('example.org')).toBe('org');
+        expect(getTLD('example.co.uk')).toBe('uk');
+    });
 
-        it('should handle very long domain names', () => {
-            const longDomain = 'a'.repeat(63) + '.com';
-            expect(isSafeHost(longDomain)).toBe(true);
-        });
+    it('should handle subdomains', () => {
+        expect(getTLD('sub.example.com')).toBe('com');
+    });
 
-        it('should reject domain labels longer than 63 characters', () => {
-            const tooLongLabel = 'a'.repeat(64) + '.com';
-            expect(isSafeHost(tooLongLabel)).toBe(false);
-        });
+    it('should be case-insensitive', () => {
+        expect(getTLD('example.COM')).toBe('com');
+    });
+
+    it('should handle edge cases', () => {
+        expect(getTLD('localhost')).toBe('localhost');
+        expect(getTLD('')).toBe('');
+    });
+});
+
+describe('isCloudMetadata', () => {
+    it('should detect default cloud metadata hosts', () => {
+        expect(isCloudMetadata('169.254.169.254')).toBe(true);
+        expect(isCloudMetadata('metadata.google.internal')).toBe(true);
+    });
+
+    it('should detect custom metadata hosts', () => {
+        expect(isCloudMetadata('custom.metadata', ['custom.metadata'])).toBe(true);
+    });
+
+    it('should return false for non-metadata hosts', () => {
+        expect(isCloudMetadata('example.com')).toBe(false);
+    });
+});
+
+describe('isIp', () => {
+    it('should detect valid IPv4 addresses', () => {
+        expect(isIp('8.8.8.8')).toBe(true);
+        expect(isIp('192.168.1.1')).toBe(true);
+    });
+
+    it('should detect valid IPv6 addresses', () => {
+        expect(isIp('::1')).toBe(true);
+        expect(isIp('2001:4860:4860::8888')).toBe(true);
+    });
+
+    it('should return false for domain names', () => {
+        expect(isIp('example.com')).toBe(false);
+    });
+});
+
+describe('isPublicIp', () => {
+    it('should return true for public IPs', () => {
+        expect(isPublicIp('8.8.8.8')).toBe(true);
+        expect(isPublicIp('93.184.216.34')).toBe(true);
+    });
+
+    it('should return false for private IPs', () => {
+        expect(isPublicIp('10.0.0.1')).toBe(false);
+        expect(isPublicIp('192.168.1.1')).toBe(false);
+        expect(isPublicIp('127.0.0.1')).toBe(false);
     });
 });

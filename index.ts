@@ -2,85 +2,198 @@ import { Agent as HttpAgent, AgentOptions as HttpAgentOptions } from 'http';
 import { Agent as HttpsAgent, AgentOptions as HttpsAgentOptions } from 'https';
 import { Duplex } from 'stream';
 
-import { isSafeHost } from './lib/utils';
-import { IsValidDomainOptions } from './lib/types';
+import { validateHost } from './lib/utils';
+import { Options, BlockEvent, BlockReason } from './lib/types';
+
+// Re-export types for consumers
+export { Options, PolicyOptions, BlockEvent, BlockReason, ValidationResult } from './lib/types';
+export { validateHost, isCloudMetadata, validatePolicy, matchesDomain, getTLD } from './lib/utils';
 
 // Define the type for the Agent that this module will modify and return.
 // It can be either an HttpAgent or an HttpsAgent.
 type CustomAgent = HttpAgent | HttpsAgent;
 
-// Instantiate the default agents
-const httpAgent = new HttpAgent();
-const httpsAgent = new HttpsAgent();
+// WeakMap to track patched agents without modifying the agent object
+const patchedAgents = new WeakMap<CustomAgent, boolean>();
 
 /**
- * Determines the correct Agent instance based on the input.
- * @param url The URL or another input to determine the agent type.
- * @returns The appropriate HttpAgent or HttpsAgent instance.
+ * Determines the correct Agent instance based on the protocol.
+ * @param url The URL or protocol hint to determine the agent type.
+ * @param options Optional options that may contain protocol hint.
+ * @returns A new HttpAgent or HttpsAgent instance.
  */
-const getAgent = (url: string): CustomAgent => {
-    // If it's a string, check if it implies HTTPS
-    if (typeof url === 'string' && url.startsWith('https')) {
-        return httpsAgent;
+const createAgent = (url: string, options?: Options): CustomAgent => {
+    const protocol = options?.protocol || url;
+    if (typeof protocol === 'string' && protocol.startsWith('https')) {
+        return new HttpsAgent();
     }
-    // Default to HTTP agent
-    return httpAgent;
+    return new HttpAgent();
 };
 
-// Define a Symbol for a unique property to prevent double-patching the agent.
-const CREATE_CONNECTION = Symbol('createConnection');
+/**
+ * Creates a BlockEvent for logging.
+ */
+function createBlockEvent(
+    url: string,
+    reason: BlockReason,
+    ip?: string,
+    hostname?: string
+): BlockEvent {
+    return {
+        url,
+        reason,
+        ip,
+        hostname,
+        timestamp: Date.now(),
+    };
+}
 
 /**
- * Patches an http.Agent or https.Agent to enforce an HOST/IP check
- * before and after a DNS lookup.
+ * Handles a block action based on mode.
+ * @returns true if the request should be blocked, false if allowed
+ */
+function handleBlock(
+    options: Options | undefined,
+    url: string,
+    reason: BlockReason,
+    ip?: string,
+    hostname?: string
+): boolean {
+    const mode = options?.mode || 'block';
+    const logger = options?.logger;
+
+    // Create event for logging
+    const event = createBlockEvent(url, reason, ip, hostname);
+
+    // Log based on mode
+    if (logger) {
+        if (mode === 'block') {
+            logger('error', `SSRF blocked: ${reason}`, event);
+        } else if (mode === 'report') {
+            logger('warn', `SSRF detected (report mode): ${reason}`, event);
+        }
+    }
+
+    // Return whether to actually block
+    return mode === 'block';
+}
+
+/**
+ * Gets a human-readable error message for a block reason.
+ */
+function getErrorMessage(reason: BlockReason, target: string): string {
+    switch (reason) {
+        case 'private_ip':
+            return `Private IP address ${target} is not allowed`;
+        case 'cloud_metadata':
+            return `Cloud metadata endpoint ${target} is not allowed`;
+        case 'invalid_domain':
+            return `Invalid domain ${target}`;
+        case 'dns_rebinding':
+            return `DNS rebinding attack detected for ${target}`;
+        case 'denied_domain':
+            return `Domain ${target} is denied by policy`;
+        case 'denied_tld':
+            return `TLD of ${target} is denied by policy`;
+        case 'not_allowed_domain':
+            return `Domain ${target} is not in the allowed list`;
+        default:
+            return `Request to ${target} is not allowed`;
+    }
+}
+
+/**
+ * Patches an http.Agent or https.Agent to enforce HOST/IP checks
+ * before and after DNS lookup, with full policy support.
  *
- * @param url The URL or another input to determine the agent type.
- * @param isValidDomainOptions Options for validating domain names.
+ * @param url The URL or protocol hint to determine the agent type.
+ * @param options Configuration options for SSRF protection.
  * @returns The patched CustomAgent instance.
  */
-const ssrfAgentGuard = function (url: string, isValidDomainOptions?: IsValidDomainOptions): CustomAgent {
-    const finalAgent = getAgent(url);
+function ssrfAgentGuard(url: string, options?: Options): CustomAgent {
+    // Create a new agent for each call to avoid shared state issues
+    const finalAgent = createAgent(url, options);
 
-    // Prevent patching the agent multiple times
-    if ((finalAgent as any)[CREATE_CONNECTION]) {
+    // If mode is 'allow', return unpatched agent
+    if (options?.mode === 'allow') {
         return finalAgent;
     }
-    (finalAgent as any)[CREATE_CONNECTION] = true;
 
-    // The original createConnection function from the Agent
-    const createConnection = finalAgent.createConnection;
+    // Check if already patched (shouldn't happen with new agents, but safety check)
+    if (patchedAgents.get(finalAgent)) {
+        return finalAgent;
+    }
+    patchedAgents.set(finalAgent, true);
 
-    // Patch the createConnection method on the agent
-    finalAgent.createConnection =  function(
-        options: HttpAgentOptions | HttpsAgentOptions,
-        fn?: (err: Error | null, stream: Duplex) => void,
+    // Store original createConnection
+    const originalCreateConnection = finalAgent.createConnection;
+
+    // Whether to detect DNS rebinding (default: true)
+    const detectDnsRebinding = options?.detectDnsRebinding !== false;
+
+    // Patch createConnection
+    finalAgent.createConnection = function (
+        connectionOptions: HttpAgentOptions | HttpsAgentOptions,
+        callback?: (err: Error | null, stream: Duplex) => void,
     ) {
-        const { host: address } = options;
+        const hostname = connectionOptions.host || '';
+
         // --- 1. Pre-DNS Check (Host/Address Check) ---
-        // If the 'host' option is an IP address, check it immediately.
-        // If it's a hostname, this check will usually pass (via defaultIpChecker).
-        if (address && !isSafeHost(address, isValidDomainOptions)) {
-            throw new Error(`DNS lookup ${address} is not allowed.`);
+        const preCheckResult = validateHost(hostname, options);
+
+        if (!preCheckResult.safe && preCheckResult.reason) {
+            const shouldBlock = handleBlock(
+                options,
+                hostname,
+                preCheckResult.reason,
+                undefined,
+                hostname
+            );
+
+            if (shouldBlock) {
+                throw new Error(getErrorMessage(preCheckResult.reason, hostname));
+            }
         }
 
         // Call the original createConnection
-        const client = createConnection.call(this, options, fn);
+        const client = originalCreateConnection.call(this, connectionOptions, callback);
 
         // --- 2. Post-DNS Check (Lookup Event Check) ---
-        // The 'lookup' event fires after the DNS lookup is complete
-        // and provides the resolved IP address.
-        client?.on('lookup', (err: Error | null, resolvedAddress: string | string[]) => {
-            // Ensure resolvedAddress is a string for the check (it's typically a string for simple lookups)
-            const ipToCheck = Array.isArray(resolvedAddress) ? resolvedAddress[0] : resolvedAddress;
+        // Only add listener if DNS rebinding detection is enabled
+        if (detectDnsRebinding && client) {
+            client.on('lookup', (err: Error | null, resolvedAddress: string | string[]) => {
+                if (err) {
+                    return; // DNS lookup failed, let it propagate naturally
+                }
 
-            // If there was an error in lookup, or if the resolved IP is allowed, do nothing.
-            if (err || isSafeHost(ipToCheck, isValidDomainOptions)) {
-                return false;
-            }
-            
-            // If the resolved IP is NOT allowed (e.g., a private IP), destroy the connection.
-            return client?.destroy(new Error(`DNS lookup ${ipToCheck} is not allowed.`));
-        });
+                // Check all resolved IPs (handle both single IP and array)
+                const ipsToCheck = Array.isArray(resolvedAddress) ? resolvedAddress : [resolvedAddress];
+
+                for (const ip of ipsToCheck) {
+                    if (!ip) continue;
+
+                    const postCheckResult = validateHost(ip, options);
+
+                    if (!postCheckResult.safe && postCheckResult.reason) {
+                        // For post-DNS check, the reason is DNS rebinding
+                        const reason: BlockReason = 'dns_rebinding';
+
+                        const shouldBlock = handleBlock(
+                            options,
+                            hostname,
+                            reason,
+                            ip,
+                            hostname
+                        );
+
+                        if (shouldBlock) {
+                            client.destroy(new Error(getErrorMessage(reason, `${hostname} -> ${ip}`)));
+                            return;
+                        }
+                    }
+                }
+            });
+        }
 
         return client;
     };
