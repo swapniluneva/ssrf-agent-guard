@@ -17,6 +17,11 @@
 
 For complete API documentation, see [API.md](./API.md).
 
+For framework-specific examples, see the [examples](./examples) directory:
+- [Express.js](./examples/express)
+- [Fastify](./examples/fastify)
+- [NestJS](./examples/nestjs)
+
 ---
 
 ## Installation
