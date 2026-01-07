@@ -6,9 +6,16 @@
 ## Features
 
 * Block requests to internal/private IPs
-* Detect and block cloud provider metadata endpoints (AWS, GCP, Azure)
+* Detect and block cloud provider metadata endpoints (AWS, GCP, Azure, Oracle, DigitalOcean, Kubernetes)
 * DNS rebinding detection
+* Policy-based domain filtering (allowlists, denylists, TLD blocking)
+* Multiple operation modes (block, report, allow)
+* Custom logging support
 * Fully written in TypeScript with type definitions
+
+## Documentation
+
+For complete API documentation, see [API.md](./API.md).
 
 ---
 
@@ -24,20 +31,15 @@ yarn add ssrf-agent-guard
 
 ## Usage
 
-`isValidDomainOptions` reference [is-valid-domain](https://github.com/miguelmota/is-valid-domain)
-
 ### axios
 
 ```ts
 const ssrfAgentGuard = require('ssrf-agent-guard');
 const url = 'https://127.0.0.1'
-const isValidDomainOptions = {
-  subdomain: true,
-  wildcard: true
-};
 axios.get(
   url, {
-    httpAgent: ssrfAgentGuard(url, isValidDomainOptions), httpsAgent: ssrfAgentGuard(url, isValidDomainOptions)
+    httpAgent: ssrfAgentGuard(url), 
+    httpsAgent: ssrfAgentGuard(url)
     })
       .then((response) => {
         console.log(`Success`);
@@ -55,12 +57,8 @@ axios.get(
 ```ts
 const ssrfAgentGuard = require('ssrf-agent-guard');
 const url = 'https://127.0.0.1'
-const isValidDomainOptions = {
-  subdomain: true,
-  wildcard: true
-};
 fetch(url, {
-    agent: ssrfAgentGuard(url, isValidDomainOptions)
+    agent: ssrfAgentGuard(url)
   })
   .then((response) => {
     console.log(`Success`);
@@ -68,6 +66,26 @@ fetch(url, {
   .catch(error => {
     console.log(`${error.toString().split('\n')[0]}`);
   });
+```
+
+### Advanced Configuration
+
+```ts
+const ssrfAgentGuard = require('ssrf-agent-guard');
+
+const agent = ssrfAgentGuard('https://api.example.com', {
+  mode: 'block',                    // 'block' | 'report' | 'allow'
+  blockCloudMetadata: true,         // Block AWS/GCP/Azure metadata endpoints
+  detectDnsRebinding: true,         // Detect DNS rebinding attacks
+  policy: {
+    allowDomains: ['*.trusted.com'], // Only allow these domains
+    denyDomains: ['evil.com'],       // Block these domains
+    denyTLD: ['local', 'internal']   // Block these TLDs
+  },
+  logger: (level, msg, meta) => {
+    console.log(`[${level}] ${msg}`, meta);
+  }
+});
 ```
 
 ---
