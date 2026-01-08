@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { SSRF_HTTP_OPTIONS, SsrfHttpModuleOptions } from './ssrf-http.module';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ssrfAgentGuard = require('ssrf-agent-guard');
+import ssrfAgentGuard from 'ssrf-agent-guard';
 
 // Cloud metadata IPs to block
 const CLOUD_METADATA_IPS = new Set([

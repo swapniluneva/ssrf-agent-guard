@@ -9,6 +9,6 @@
   "dependencies": {
     "fastify": "^4.24.0",
     "node-fetch": "^3.3.0",
-    "ssrf-agent-guard": "^0.1.8"
+    "ssrf-agent-guard": "^0.1.12"
   }
 }

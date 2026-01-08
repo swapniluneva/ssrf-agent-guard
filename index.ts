@@ -203,3 +203,4 @@ function ssrfAgentGuard(url: string, options?: Options): CustomAgent {
 
 export default ssrfAgentGuard;
 module.exports = ssrfAgentGuard;
+module.exports.default = ssrfAgentGuard;
