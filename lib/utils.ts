@@ -1,12 +1,7 @@
 // lib/utils.ts
 import isValidDomain from 'is-valid-domain';
 import ipaddr from 'ipaddr.js';
-import {
-    CLOUD_METADATA_HOSTS,
-    Options,
-    PolicyOptions,
-    ValidationResult,
-} from './types';
+import { CLOUD_METADATA_HOSTS, Options, PolicyOptions, ValidationResult } from './types';
 
 /**
  * Checks if the input is an IP address (v4/v6).
@@ -61,7 +56,7 @@ export function matchesDomain(hostname: string, pattern: string): boolean {
  * Checks if a hostname matches any domain in a list.
  */
 function matchesAnyDomain(hostname: string, domains: string[]): boolean {
-    return domains.some(domain => matchesDomain(hostname, domain));
+    return domains.some((domain) => matchesDomain(hostname, domain));
 }
 
 /**
@@ -94,7 +89,7 @@ export function validatePolicy(hostname: string, policy?: PolicyOptions): Valida
     // Check denyTLD
     if (policy.denyTLD && policy.denyTLD.length > 0) {
         const tld = getTLD(hostname);
-        if (policy.denyTLD.map(t => t.toLowerCase()).includes(tld)) {
+        if (policy.denyTLD.map((t) => t.toLowerCase()).includes(tld)) {
             return { safe: false, reason: 'denied_tld' };
         }
     }

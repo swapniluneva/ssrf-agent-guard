@@ -157,7 +157,10 @@ describe('ssrfAgentGuard', () => {
             const agent = ssrfAgentGuard('http://169.254.169.254');
 
             expect(() => {
-                agent.createConnection({ host: '169.254.169.254', port: 80 } as any, undefined as any);
+                agent.createConnection(
+                    { host: '169.254.169.254', port: 80 } as any,
+                    undefined as any,
+                );
             }).toThrow('Cloud metadata endpoint 169.254.169.254 is not allowed');
         });
 
@@ -220,7 +223,7 @@ describe('ssrfAgentGuard', () => {
             expect(mockSocket.destroy).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('DNS rebinding attack detected'),
-                })
+                }),
             );
         });
 
@@ -277,7 +280,7 @@ describe('ssrfAgentGuard', () => {
             expect(mockSocket.destroy).toHaveBeenCalledWith(
                 expect.objectContaining({
                     message: expect.stringContaining('DNS rebinding attack detected'),
-                })
+                }),
             );
         });
 
@@ -375,7 +378,10 @@ describe('ssrfAgentGuard', () => {
             mockedValidateHost.mockReturnValue({ safe: true });
 
             const agent = ssrfAgentGuard('http://example.com');
-            const result = agent.createConnection({ host: 'example.com', port: 80 } as any, undefined as any);
+            const result = agent.createConnection(
+                { host: 'example.com', port: 80 } as any,
+                undefined as any,
+            );
 
             expect(result).toBe(mockSocket);
         });
@@ -445,7 +451,10 @@ describe('ssrfAgentGuard', () => {
             const agent = ssrfAgentGuard('http://169.254.169.254/latest/meta-data/');
 
             expect(() => {
-                agent.createConnection({ host: '169.254.169.254', port: 80 } as any, undefined as any);
+                agent.createConnection(
+                    { host: '169.254.169.254', port: 80 } as any,
+                    undefined as any,
+                );
             }).toThrow('Cloud metadata endpoint 169.254.169.254 is not allowed');
         });
 
@@ -455,7 +464,10 @@ describe('ssrfAgentGuard', () => {
             const agent = ssrfAgentGuard('https://api.github.com');
 
             expect(() => {
-                agent.createConnection({ host: 'api.github.com', port: 443 } as any, undefined as any);
+                agent.createConnection(
+                    { host: 'api.github.com', port: 443 } as any,
+                    undefined as any,
+                );
             }).not.toThrow();
 
             // Simulate successful DNS resolution to public IP
@@ -466,12 +478,7 @@ describe('ssrfAgentGuard', () => {
         it('should protect against SSRF via localhost variations', () => {
             mockedValidateHost.mockReturnValue({ safe: false, reason: 'private_ip' });
 
-            const localhostVariants = [
-                '127.0.0.1',
-                '0.0.0.0',
-                '127.0.0.2',
-                '127.255.255.255',
-            ];
+            const localhostVariants = ['127.0.0.1', '0.0.0.0', '127.0.0.2', '127.255.255.255'];
 
             localhostVariants.forEach((host) => {
                 const agent = ssrfAgentGuard('http://example.com');
@@ -522,7 +529,10 @@ describe('ssrfAgentGuard', () => {
             const agent = ssrfAgentGuard('https://api.example.com');
 
             expect(() => {
-                agent.createConnection({ host: 'api.example.com', port: 443 } as any, undefined as any);
+                agent.createConnection(
+                    { host: 'api.example.com', port: 443 } as any,
+                    undefined as any,
+                );
             }).not.toThrow();
         });
     });
@@ -575,7 +585,7 @@ describe('ssrfAgentGuard', () => {
                 expect(logger).toHaveBeenCalledWith(
                     'warn',
                     expect.stringContaining('SSRF detected'),
-                    expect.objectContaining({ reason: 'private_ip' })
+                    expect.objectContaining({ reason: 'private_ip' }),
                 );
             });
 
@@ -597,7 +607,10 @@ describe('ssrfAgentGuard', () => {
                 const agent = ssrfAgentGuard('http://example.com', { logger });
 
                 expect(() => {
-                    agent.createConnection({ host: '169.254.169.254', port: 80 } as any, undefined as any);
+                    agent.createConnection(
+                        { host: '169.254.169.254', port: 80 } as any,
+                        undefined as any,
+                    );
                 }).toThrow();
 
                 expect(logger).toHaveBeenCalledWith(
@@ -607,7 +620,7 @@ describe('ssrfAgentGuard', () => {
                         url: '169.254.169.254',
                         reason: 'cloud_metadata',
                         timestamp: expect.any(Number),
-                    })
+                    }),
                 );
             });
 
@@ -680,7 +693,7 @@ describe('ssrfAgentGuard', () => {
 
                 expect(mockedValidateHost).toHaveBeenCalledWith(
                     'example.com',
-                    expect.objectContaining({ policy: options.policy })
+                    expect.objectContaining({ policy: options.policy }),
                 );
             });
         });
