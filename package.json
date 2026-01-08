@@ -1,6 +1,6 @@
 {
   "name": "ssrf-agent-guard",
-  "version": "0.1.0",
+  "version": "0.1.9",
   "description": "A TypeScript SSRF protection library for Node.js (express/axios) with advanced policies, DNS rebinding detection and cloud metadata protection.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
