@@ -52,7 +52,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "ipaddr.js": "^2.2.0",
+    "ipaddr.js": "^2.3.0",
     "is-valid-domain": "^0.1.6"
   }
 }
