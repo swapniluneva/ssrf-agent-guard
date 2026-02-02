@@ -21,6 +21,8 @@
 
 For complete API documentation, see [API.md](./API.md).
 
+For detailed information about blocked IP ranges and security rationale, see [IP_RANGES.md](./IP_RANGES.md).
+
 For framework-specific examples, see the [examples](./examples) directory:
 - [Express.js](./examples/express)
 - [Fastify](./examples/fastify)
