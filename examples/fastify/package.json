@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "fastify": "^4.24.0",
+    "fastify": "^5.7.3",
     "node-fetch": "^3.3.0",
     "ssrf-agent-guard": "^0.1.12"
   }
